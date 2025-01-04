@@ -1,0 +1,182 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Crypto Prices Animation</title>
+    <style>
+        body {
+            margin: 0;
+            overflow: hidden;
+            font-family: Arial, sans-serif;
+            background: linear-gradient(to bottom, #1e1e2f, #28293d);
+            color: white;
+        }
+
+        .crypto-container {
+            position: relative;
+            height: 100vh;
+            overflow: hidden;
+        }
+
+        .crypto {
+            position: absolute;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            font-size: 14px;
+            background: rgba(255, 255, 255, 0.1);
+            padding: 8px 12px;
+            border-radius: 12px;
+            box-shadow: 0 0 10px rgba(0, 0, 0, 0.5);
+        }
+
+        .crypto img {
+            width: 24px;
+            height: 24px;
+            border-radius: 50%;
+        }
+
+        .basket {
+            position: absolute;
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 100px;
+            height: 60px;
+            background: url('https://pngimg.com/uploads/shopping_cart/small/shopping_cart_PNG28.png') no-repeat center;
+            background-size: contain;
+            transition: left 0.3s ease-in-out;
+        }
+
+        .basket-label {
+            position: absolute;
+            bottom: -20px;
+            left: 50%;
+            transform: translateX(-50%);
+            font-size: 12px;
+            color: white;
+            text-align: center;
+        }
+
+        @media (max-width: 768px) {
+            .crypto {
+                font-size: 12px;
+            }
+
+            .basket {
+                width: 80px;
+                height: 50px;
+            }
+
+            .basket-label {
+                font-size: 10px;
+            }
+        }
+    </style>
+</head>
+
+<body>
+    <div class="crypto-container"></div>
+    <div class="basket">
+        <div class="basket-label">&copy;ebelizm</div>
+    </div>
+
+    <script>
+        async function fetchCryptoPrices() {
+            const response = await fetch('https://api.coingecko.com/api/v3/coins/markets?vs_currency=usd&order=market_cap_desc&per_page=100&page=1&sparkline=false');
+            const data = await response.json();
+
+            return data.map(coin => ({
+                name: coin.name,
+                price: `$${coin.current_price.toFixed(2)}`,
+                logo: coin.image
+            }));
+        }
+
+        function randomPosition() {
+            const width = window.innerWidth;
+            return Math.max(0, Math.min(width - 100, Math.random() * width)); // Ensure within frame
+        }
+
+        function createCryptoElement(crypto) {
+            const el = document.createElement('div');
+            el.classList.add('crypto');
+            el.style.left = `${randomPosition()}px`;
+            el.style.top = '0px';
+            el.innerHTML = `
+        <img src="${crypto.logo}" alt="${crypto.name} logo" />
+        <span>${crypto.name}: ${crypto.price}</span>
+      `;
+            return el;
+        }
+
+        function animateCrypto(el, container, basket) {
+            let top = 0;
+            let velocity = 1 + Math.random() * 1.5; // Slower falling speed
+
+            function move() {
+                top += velocity;
+                el.style.top = `${top}px`;
+
+                // Smoothly move basket to follow the crypto
+                const basketCenter = parseFloat(el.style.left) + el.offsetWidth / 2;
+                basket.style.left = `${Math.min(window.innerWidth - basket.offsetWidth, Math.max(0, basketCenter - basket.offsetWidth / 2))}px`;
+
+                // Check for collision with the basket
+                const basketRect = basket.getBoundingClientRect();
+                const cryptoRect = el.getBoundingClientRect();
+
+                if (
+                    cryptoRect.bottom >= basketRect.top &&
+                    cryptoRect.left < basketRect.right &&
+                    cryptoRect.right > basketRect.left
+                ) {
+                    container.removeChild(el); // Remove the crypto from the container
+                    spawnRandomCrypto(container, basket); // Spawn a new crypto
+                    return;
+                }
+
+                // Remove the element if it leaves the bottom of the frame
+                if (top > window.innerHeight) {
+                    container.removeChild(el);
+                    spawnRandomCrypto(container, basket); // Spawn a new crypto
+                    return;
+                }
+
+                requestAnimationFrame(move);
+            }
+
+            move();
+        }
+
+        function spawnRandomCrypto(container, basket) {
+            const cryptosToSpawn = Math.floor(3 + Math.random() * 3); // Randomly spawn between 3-5 cryptos
+            for (let i = 0; i < cryptosToSpawn; i++) {
+                const crypto = allCryptos[Math.floor(Math.random() * allCryptos.length)];
+                const el = createCryptoElement(crypto);
+                container.appendChild(el);
+                animateCrypto(el, container, basket);
+            }
+        }
+
+        let allCryptos = [];
+
+        async function renderCryptos() {
+            const container = document.querySelector('.crypto-container');
+            const basket = document.querySelector('.basket');
+            container.innerHTML = ""; // Clear the previous cryptos
+            allCryptos = await fetchCryptoPrices();
+
+            spawnRandomCrypto(container, basket); // Start spawning cryptos
+
+            // Refresh the CryptoPrices every minute
+            setTimeout(renderCryptos, 60000);
+        }
+
+        renderCryptos();
+    </script>
+</body>
+
+</html>
